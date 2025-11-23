@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MediaVPN - Cyberpunk Dashboard</title>
+    <title>MediaVPN - Cyberpunk Control Center</title>
     
     <link rel="stylesheet" href="styles.css">
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -18,11 +19,11 @@
 
     <div class="mobile-header">
         <div class="nav-logo">
-            <i class="fas fa-shield-halved"></i>
+            <i class="fas fa-shield-halved" style="color: var(--primary);"></i>
             <span>MediaVPN</span>
         </div>
         <div class="nav-actions">
-             <button class="theme-toggle" id="mobileThemeToggle">
+            <button class="theme-toggle" id="mobileThemeToggle">
                 <i class="fas fa-sun"></i>
             </button>
         </div>
@@ -45,8 +46,8 @@
                     <span>Proxies</span>
                 </a>
                 <a href="#subscriptions" class="nav-link">
-                    <i class="fas fa-ticket"></i>
-                    <span>Subs</span>
+                    <i class="fas fa-bolt"></i>
+                    <span>Generator</span>
                 </a>
                 <a href="#settings" class="nav-link">
                     <i class="fas fa-sliders"></i>
@@ -59,7 +60,9 @@
                     <i class="fas fa-sun"></i>
                 </button>
                 <div class="user-menu">
-                    <i class="fas fa-circle-user"></i>
+                    <div class="user-avatar">
+                        <i class="fas fa-user-astronaut"></i>
+                    </div>
                 </div>
             </div>
         </div>
@@ -69,7 +72,10 @@
         
         <section id="dashboard" class="section active">
             <div class="container">
-                <h1 class="section-title">Overview</h1>
+                <div class="section-header">
+                    <h1 class="section-title">Network Overview</h1>
+                    <span class="live-indicator"><i class="fas fa-circle"></i> Live System</span>
+                </div>
                 
                 <div class="stats-grid">
                     <div class="stat-card">
@@ -78,25 +84,25 @@
                         </div>
                         <div class="stat-content">
                             <h3 class="stat-number" id="totalProxies">0</h3>
-                            <p class="stat-label">Total Proxies</p>
+                            <p class="stat-label">Total Nodes</p>
                         </div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon online">
-                            <i class="fas fa-wifi"></i>
+                            <i class="fas fa-signal"></i>
                         </div>
                         <div class="stat-content">
                             <h3 class="stat-number" id="activeProxies">0</h3>
-                            <p class="stat-label">Online Servers</p>
+                            <p class="stat-label">Online Status</p>
                         </div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">
-                            <i class="fas fa-earth-asia"></i>
+                            <i class="fas fa-globe-asia"></i>
                         </div>
                         <div class="stat-content">
                             <h3 class="stat-number" id="countriesCount">0</h3>
-                            <p class="stat-label">Countries</p>
+                            <p class="stat-label">Regions</p>
                         </div>
                     </div>
                     <div class="stat-card">
@@ -112,11 +118,11 @@
 
                 <div class="charts-grid">
                     <div class="chart-card">
-                        <h3 class="chart-title">Server Distribution</h3>
+                        <h3 class="chart-title">Traffic Distribution</h3>
                         <canvas id="countryChart"></canvas>
                     </div>
                     <div class="chart-card">
-                        <h3 class="chart-title">Network Health</h3>
+                        <h3 class="chart-title">Server Health</h3>
                         <canvas id="statusChart"></canvas>
                     </div>
                 </div>
@@ -125,19 +131,17 @@
 
         <section id="proxies" class="section">
             <div class="container">
-                <h1 class="section-title">Proxy Network</h1>
+                <h1 class="section-title">Active Nodes</h1>
                 
                 <div class="filters">
-                    <div class="filter-group">
-                        <input type="text" id="searchInput" placeholder="Search IP or Provider..." class="search-input">
+                    <div class="filter-group" style="flex-grow: 1;">
+                        <div class="search-wrapper">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="searchInput" placeholder="Search IP, Country, or Protocol..." class="search-input">
+                        </div>
                     </div>
                     <div class="filter-group">
-                        <select id="countryFilter" class="filter-select">
-                            <option value="">All Countries</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                         <button class="btn btn-primary" id="refreshProxies">
+                        <button class="btn btn-primary" id="refreshProxies">
                             <i class="fas fa-sync-alt"></i> Refresh
                         </button>
                     </div>
@@ -148,11 +152,11 @@
                         <thead>
                             <tr>
                                 <th>Country</th>
-                                <th>IP Address</th>
+                                <th>Host / IP</th>
                                 <th>Port</th>
                                 <th>Protocol</th>
                                 <th>Status</th>
-                                <th>Latency</th>
+                                <th>Ping</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -165,36 +169,53 @@
 
         <section id="subscriptions" class="section">
             <div class="container">
-                <h1 class="section-title">Subscription</h1>
+                <h1 class="section-title">Create Config</h1>
                 
                 <div class="subscription-generator">
                     <form id="subscriptionForm">
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Format</label>
+                                <label><i class="fas fa-globe"></i> Domain / Bug Host (SNI)</label>
+                                <input type="text" id="serverHost" placeholder="examples: m.youtube.com / cf.worker.dev" value="cf.mediavpn.site">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label><i class="fas fa-layer-group"></i> Protocol Type</label>
                                 <select id="formatSelect">
-                                    <option value="clash">Clash (Meta)</option>
-                                    <option value="v2ray">V2Ray / Vmess</option>
-                                    <option value="raw">Raw / Base64</option>
+                                    <option value="vmess">Vmess (WS + TLS)</option>
+                                    <option value="vless">Vless (WS + TLS)</option>
+                                    <option value="trojan">Trojan (WS + TLS)</option>
+                                    <option value="clash">Clash Config (YAML)</option>
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>Limit (GB)</label>
-                                <input type="number" id="limitInput" value="10">
+                                <label><i class="fas fa-stopwatch"></i> Expired (Days)</label>
+                                <input type="number" id="limitInput" value="30" readonly style="opacity: 0.6;">
                             </div>
                         </div>
+
                         <br>
-                        <button type="button" class="btn btn-primary" id="generateLink" style="width:100%">
-                            <i class="fas fa-bolt"></i> Generate Config
+                        <button type="button" class="btn btn-primary" id="generateLink" style="width: 100%; padding: 15px; font-size: 1.1rem;">
+                            <i class="fas fa-fingerprint"></i> GENERATE SECURE CONFIG
                         </button>
                     </form>
 
-                    <div id="generatedLink" style="display: none; margin-top: 20px;">
-                        <div class="link-container" style="display:flex; gap:10px;">
-                            <input type="text" id="subscriptionLink" readonly>
-                            <button class="btn btn-secondary" id="copySubscriptionLink">
-                                <i class="fas fa-copy"></i>
-                            </button>
+                    <div id="generatedLink" style="display: none; margin-top: 25px; animation: fadeIn 0.5s;">
+                        <div class="setting-card" style="border-color: var(--primary);">
+                            <label style="color: var(--primary); font-weight: bold; margin-bottom: 10px; display: block;">
+                                <i class="fas fa-check-circle"></i> Config Created Successfully:
+                            </label>
+                            <div class="link-container" style="display: flex; gap: 10px;">
+                                <input type="text" id="subscriptionLink" readonly style="font-family: monospace; color: var(--primary);">
+                                <button class="btn btn-secondary" id="copySubscriptionLink">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 10px;">
+                                *Salin config di atas dan import ke aplikasi (V2RayNG / NapsternetV / Clash).
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -203,33 +224,45 @@
 
         <section id="settings" class="section">
             <div class="container">
-                <h1 class="section-title">System</h1>
+                <h1 class="section-title">System Settings</h1>
                 
                 <div class="settings-grid">
                     <div class="setting-card">
-                        <h3><i class="fas fa-server"></i> Node Config</h3>
-                        <div class="form-group">
-                            <label>Worker Host</label>
-                            <input type="text" id="serverHost" placeholder="worker.domain.com">
+                        <h3><i class="fas fa-paint-brush"></i> Appearance</h3>
+                        <div class="setting-item" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+                            <span>Dark Mode / Neon</span>
+                            <div class="toggle-switch">
+                                <input type="checkbox" checked disabled>
+                            </div>
                         </div>
-                        <div class="form-group" style="margin-top:10px;">
-                            <label>Max Connections</label>
-                            <input type="number" value="1000">
+                        <div class="setting-item" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+                            <span>Glassmorphism Effect</span>
+                            <div class="toggle-switch">
+                                <input type="checkbox" checked disabled>
+                            </div>
                         </div>
                     </div>
-                    
+
                     <div class="setting-card">
-                         <button class="btn btn-primary" style="width:100%">Save Configuration</button>
+                        <h3><i class="fas fa-info-circle"></i> About App</h3>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 10px;">
+                            MediaVPN Dashboard v2.0 (Cyberpunk Edition)<br>
+                            Build: 2025.11.23<br>
+                            Powered by Cloudflare Workers
+                        </p>
+                        <br>
+                        <button class="btn btn-secondary" style="width: 100%;">Check Updates</button>
                     </div>
                 </div>
             </div>
         </section>
+
     </main>
 
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner">
-            <i class="fas fa-circle-notch fa-spin" style="font-size: 2rem; color: var(--primary)"></i>
-            <p style="margin-top:10px">Connecting...</p>
+            <i class="fas fa-circle-notch fa-spin" style="font-size: 3rem; color: var(--primary); margin-bottom: 15px;"></i>
+            <p>Processing Data...</p>
         </div>
     </div>
 
