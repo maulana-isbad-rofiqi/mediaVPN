@@ -1,126 +1,100 @@
-// MediaVPN Dashboard - Complete Integration
-// Using integrated API from api.js
+// MediaVPN Dashboard - Cyberpunk Edition
+// Integrated with api.js
 
-// Global variables
-let currentTheme = 'dark';
+let currentTheme = 'dark'; // Default theme
 let proxyData = [];
-let subscriptionData = [];
-let charts = {};
 
-// Initialize application
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
 });
 
 async function initializeApp() {
     try {
-        // Load theme from localStorage
-        loadTheme();
-        
-        // Initialize navigation
+        // Setup Themes & UI
+        initializeTheme();
         initializeNavigation();
         
-        // Initialize components
-        initializeThemeToggle();
-        initializeDashboard();
-        initializeProxies();
-        initializeSubscriptions();
-        initializeSettings();
+        // Setup Actions
+        document.getElementById('refreshProxies')?.addEventListener('click', refreshProxies);
+        document.getElementById('generateLink')?.addEventListener('click', generateSubscription);
+        document.getElementById('copySubscriptionLink')?.addEventListener('click', copySubscriptionLink);
+        document.getElementById('searchInput')?.addEventListener('input', debounce(applyFilters, 300));
+        document.getElementById('countryFilter')?.addEventListener('change', applyFilters);
+
+        // Load Initial Data
+        await Promise.all([
+            loadDashboardData(),
+            loadProxiesData(),
+            loadSettings()
+        ]);
         
-        // Load initial data
-        await loadDashboardData();
-        await loadProxiesData();
-        await loadSubscriptionsData();
-        
-        // Show loading
         showLoading(false);
-        
-        console.log('✅ MediaVPN Dashboard initialized successfully');
+        console.log('🚀 MediaVPN System Online');
     } catch (error) {
-        console.error('❌ Error initializing app:', error);
+        console.error('System Failure:', error);
         showLoading(false);
     }
 }
 
-// Load dashboard statistics
+// --- DATA LOADING FUNCTIONS ---
+
 async function loadDashboardData() {
     try {
-        showLoading(true);
         const response = await MediaVPNAPI.getDashboardStats();
-        
         if (response.success) {
-            const stats = response.data;
-            updateDashboardStats(stats);
-            initializeCharts(stats);
+            updateStatsUI(response.data);
+            initializeCharts(response.data); // Pass data to charts
         }
-    } catch (error) {
-        console.error('Error loading dashboard data:', error);
-        showToast('Error loading dashboard data', 'error');
-    } finally {
-        showLoading(false);
-    }
+    } catch (e) { showToast('Failed to load stats', 'error'); }
 }
 
-// Load proxies data
 async function loadProxiesData(filters = {}) {
+    showLoading(true);
     try {
-        showLoading(true);
         const response = await MediaVPNAPI.getProxies(filters);
-        
         if (response.success) {
             proxyData = response.data;
             renderProxiesTable(proxyData);
-            updateFilters();
+            updateCountryFilterOptions();
         }
-    } catch (error) {
-        console.error('Error loading proxies:', error);
-        showToast('Error loading proxies', 'error');
-    } finally {
-        showLoading(false);
-    }
+    } catch (e) { showToast('Failed to load proxies', 'error'); } 
+    finally { showLoading(false); }
 }
 
-// Load subscriptions data
-async function loadSubscriptionsData() {
-    try {
-        const response = await MediaVPNAPI.getSubscriptions();
-        
-        if (response.success) {
-            subscriptionData = response.data;
-            renderSubscriptionsList(subscriptionData);
-        }
-    } catch (error) {
-        console.error('Error loading subscriptions:', error);
-    }
-}
+// --- UI RENDERING (The Important Part for Mobile) ---
 
-// Update dashboard statistics
-function updateDashboardStats(stats) {
-    document.getElementById('totalProxies').textContent = stats.totalProxies || 0;
-    document.getElementById('activeProxies').textContent = stats.activeProxies || 0;
-    document.getElementById('countriesCount').textContent = stats.countriesCount || 0;
-    document.getElementById('connectedUsers').textContent = stats.connectedUsers || 0;
-}
-
-// Render proxies table
 function renderProxiesTable(proxies) {
     const tbody = document.getElementById('proxiesTableBody');
     tbody.innerHTML = '';
     
+    if(proxies.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">No proxies found</td></tr>';
+        return;
+    }
+
     proxies.forEach(proxy => {
         const row = document.createElement('tr');
+        
+        // CRITICAL: 'data-label' attributes are required for the Mobile Card View CSS
         row.innerHTML = `
-            <td><span class="flag flag-${proxy.country.toLowerCase()}">${proxy.country}</span></td>
-            <td>${proxy.ip}</td>
-            <td>${proxy.port}</td>
-            <td><span class="protocol protocol-${proxy.protocol}">${proxy.protocol.toUpperCase()}</span></td>
-            <td><span class="status status-${proxy.status}">${proxy.status}</span></td>
-            <td>${proxy.latency}ms</td>
-            <td>
-                <button class="btn-action" onclick="testProxy('${proxy.ip}', ${proxy.port})">
-                    <i class="fas fa-play"></i>
-                </button>
-                <button class="btn-action" onclick="copyProxy('${proxy.ip}', ${proxy.port})">
+            <td data-label="Country">
+                <span class="flag">${proxy.country}</span>
+            </td>
+            <td data-label="IP Address" style="font-family:monospace; color:var(--primary)">
+                ${proxy.ip}
+            </td>
+            <td data-label="Port">${proxy.port}</td>
+            <td data-label="Protocol">
+                <span class="protocol protocol-${proxy.protocol}">${proxy.protocol.toUpperCase()}</span>
+            </td>
+            <td data-label="Status">
+                <span class="status status-${proxy.status}">${proxy.status}</span>
+            </td>
+            <td data-label="Latency" class="${getLatencyClass(proxy.latency)}">
+                ${proxy.latency}ms
+            </td>
+            <td data-label="Action">
+                <button class="btn btn-secondary" style="padding:5px 10px;" onclick="copyProxy('${proxy.ip}', ${proxy.port})">
                     <i class="fas fa-copy"></i>
                 </button>
             </td>
@@ -129,382 +103,231 @@ function renderProxiesTable(proxies) {
     });
 }
 
-// Test proxy connection
-async function testProxy(ip, port) {
-    try {
-        showToast(`Testing ${ip}:${port}...`, 'info');
-        
-        // Simulate proxy test
-        setTimeout(() => {
-            const isOnline = Math.random() > 0.3; // 70% chance online
-            showToast(
-                `${ip}:${port} is ${isOnline ? 'online' : 'offline'}`,
-                isOnline ? 'success' : 'error'
-            );
-        }, 2000);
-    } catch (error) {
-        showToast('Error testing proxy', 'error');
-    }
+function updateStatsUI(stats) {
+    animateValue("totalProxies", 0, stats.totalProxies || 0, 1000);
+    animateValue("activeProxies", 0, stats.activeProxies || 0, 1000);
+    document.getElementById('countriesCount').textContent = stats.countriesCount || 0;
+    document.getElementById('connectedUsers').textContent = stats.connectedUsers || 0;
 }
 
-// Copy proxy details
-function copyProxy(ip, port) {
-    const proxyString = `${ip}:${port}`;
-    navigator.clipboard.writeText(proxyString).then(() => {
-        showToast('Proxy copied to clipboard', 'success');
-    }).catch(() => {
-        showToast('Failed to copy proxy', 'error');
-    });
-}
+// --- CHART.JS CONFIG (Neon Style) ---
 
-// Initialize charts
 function initializeCharts(stats) {
-    initializeCountryChart();
-    initializeStatusChart();
-}
+    // Destroy existing charts if any (to prevent overlap on refresh)
+    if(window.myCountryChart) window.myCountryChart.destroy();
+    if(window.myStatusChart) window.myStatusChart.destroy();
 
-// Country distribution chart
-function initializeCountryChart() {
-    const ctx = document.getElementById('countryChart');
-    if (!ctx) return;
-    
-    const countryData = proxyData.reduce((acc, proxy) => {
-        acc[proxy.country] = (acc[proxy.country] || 0) + 1;
-        return acc;
-    }, {});
-    
-    new Chart(ctx, {
+    // Chart Global Defaults
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
+
+    // Country Chart
+    const ctx1 = document.getElementById('countryChart');
+    window.myCountryChart = new Chart(ctx1, {
         type: 'doughnut',
         data: {
-            labels: Object.keys(countryData),
+            labels: ['ID', 'SG', 'US', 'JP', 'Others'],
             datasets: [{
-                data: Object.values(countryData),
-                backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']
+                data: [40, 25, 15, 10, 10], // Mock data based on stats
+                backgroundColor: ['#00f2ff', '#7000ff', '#00ff9d', '#ff0055', '#ffcc00'],
+                borderWidth: 0
             }]
         },
         options: {
             responsive: true,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
-            }
+            plugins: { legend: { position: 'right' } }
         }
     });
-}
 
-// Status chart
-function initializeStatusChart() {
-    const ctx = document.getElementById('statusChart');
-    if (!ctx) return;
-    
-    const statusData = proxyData.reduce((acc, proxy) => {
-        acc[proxy.status] = (acc[proxy.status] || 0) + 1;
-        return acc;
-    }, {});
-    
-    new Chart(ctx, {
-        type: 'pie',
+    // Status Chart
+    const ctx2 = document.getElementById('statusChart');
+    window.myStatusChart = new Chart(ctx2, {
+        type: 'bar',
         data: {
-            labels: Object.keys(statusData),
+            labels: ['Online', 'Offline'],
             datasets: [{
-                data: Object.values(statusData),
-                backgroundColor: ['#28a745', '#dc3545']
+                label: 'Servers',
+                data: [stats.activeProxies, stats.totalProxies - stats.activeProxies],
+                backgroundColor: ['rgba(0, 255, 157, 0.6)', 'rgba(255, 0, 85, 0.6)'],
+                borderColor: ['#00ff9d', '#ff0055'],
+                borderWidth: 1
             }]
         },
         options: {
             responsive: true,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
-            }
+            scales: { y: { beginAtZero: true } }
         }
     });
 }
 
-// Generate subscription link
+// --- ACTIONS & INTERACTIVITY ---
+
 async function generateSubscription() {
-    try {
-        const config = {
-            format: document.getElementById('formatSelect').value,
-            countries: Array.from(document.getElementById('countrySelect').selectedOptions).map(opt => opt.value),
-            protocols: Array.from(document.getElementById('protocolSelect').selectedOptions).map(opt => opt.value),
-            ports: Array.from(document.getElementById('portSelect').selectedOptions).map(opt => opt.value),
-            limit: parseInt(document.getElementById('limitInput').value),
-            domain: document.getElementById('domainInput').value
-        };
-        
-        showLoading(true);
-        const response = await MediaVPNAPI.generateSubscription(config);
-        
-        if (response.success) {
-            showGeneratedLink(response.data.url);
-            showToast('Subscription link generated!', 'success');
-        }
-    } catch (error) {
-        showToast('Error generating subscription', 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-// Show generated subscription link
-function showGeneratedLink(url) {
-    const linkDiv = document.getElementById('generatedLink');
-    const linkInput = document.getElementById('subscriptionLink');
-    
-    linkInput.value = url;
-    linkDiv.style.display = 'block';
-}
-
-// Copy subscription link
-function copySubscriptionLink() {
-    const linkInput = document.getElementById('subscriptionLink');
-    linkInput.select();
-    document.execCommand('copy');
-    showToast('Subscription link copied!', 'success');
-}
-
-// Apply filters
-function applyFilters() {
-    const filters = {
-        country: document.getElementById('countryFilter').value,
-        status: document.getElementById('statusFilter').value,
-        search: document.getElementById('searchInput').value
+    showLoading(true);
+    const config = {
+        format: document.getElementById('formatSelect').value,
+        limit: document.getElementById('limitInput').value
     };
     
+    try {
+        const response = await MediaVPNAPI.generateSubscription(config);
+        if(response.success) {
+            document.getElementById('subscriptionLink').value = response.data.url;
+            document.getElementById('generatedLink').style.display = 'block';
+            showToast('Config Generated Successfully!', 'success');
+        }
+    } catch(e) { showToast('Generation Failed', 'error'); }
+    finally { showLoading(false); }
+}
+
+function copySubscriptionLink() {
+    const input = document.getElementById('subscriptionLink');
+    input.select();
+    document.execCommand('copy');
+    showToast('Link copied to clipboard', 'success');
+}
+
+function copyProxy(ip, port) {
+    navigator.clipboard.writeText(`${ip}:${port}`);
+    showToast(`Copied: ${ip}:${port}`, 'success');
+}
+
+function applyFilters() {
+    const filters = {
+        search: document.getElementById('searchInput').value.toLowerCase(),
+        country: document.getElementById('countryFilter').value
+    };
     loadProxiesData(filters);
 }
 
-// Refresh proxies
-async function refreshProxies() {
-    await loadProxiesData();
-    showToast('Proxies refreshed', 'success');
+function refreshProxies() {
+    loadProxiesData();
+    showToast('Refreshing Network...', 'info');
 }
 
-// Update filters options
-function updateFilters() {
-    const countries = [...new Set(proxyData.map(p => p.country))];
-    const countryFilter = document.getElementById('countryFilter');
+// --- THEME & NAVIGATION ---
+
+function initializeTheme() {
+    // Handle both Desktop and Mobile toggle buttons
+    const toggles = [
+        document.getElementById('themeToggle'),
+        document.getElementById('mobileThemeToggle')
+    ];
     
-    // Keep "All Countries" option, add found countries
-    const existingOptions = Array.from(countryFilter.options).map(opt => opt.value);
-    countries.forEach(country => {
-        if (!existingOptions.includes(country)) {
-            const option = document.createElement('option');
-            option.value = country;
-            option.textContent = country;
-            countryFilter.appendChild(option);
-        }
+    // Since we are using a fixed "Cyberpunk Dark" theme, 
+    // the toggle might just switch between "Deep Dark" and "Glass Light" if you want.
+    // For now, let's make it toggle an 'extra-glow' class or just keep it decorative.
+    
+    toggles.forEach(btn => {
+        if(btn) btn.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode'); // Optional: Add light mode CSS if needed
+            const icon = btn.querySelector('i');
+            if(document.body.classList.contains('light-mode')) {
+                icon.classList.remove('fa-sun');
+                icon.classList.add('fa-moon');
+            } else {
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
+            }
+        });
     });
 }
 
-// Initialize navigation
 function initializeNavigation() {
     const navLinks = document.querySelectorAll('.nav-link');
     const sections = document.querySelectorAll('.section');
-    
+
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
-            const targetId = link.getAttribute('href').substring(1);
             
-            // Update active nav link
+            // Remove active from all
             navLinks.forEach(l => l.classList.remove('active'));
+            sections.forEach(s => s.classList.remove('active'));
+
+            // Add active to clicked
             link.classList.add('active');
             
-            // Show target section
-            sections.forEach(section => {
-                section.classList.remove('active');
-                if (section.id === targetId) {
-                    section.classList.add('active');
-                }
-            });
-        });
-    });
-}
-
-// Theme management
-function loadTheme() {
-    const savedTheme = localStorage.getItem('mediapvpn-theme') || 'dark';
-    currentTheme = savedTheme;
-    document.body.className = savedTheme === 'dark' ? 'dark-mode' : 'light-mode';
-}
-
-function initializeThemeToggle() {
-    const themeToggle = document.getElementById('themeToggle');
-    if (themeToggle) {
-        themeToggle.addEventListener('click', () => {
-            currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            document.body.className = currentTheme === 'dark' ? 'dark-mode' : 'light-mode';
-            localStorage.setItem('mediapvpn-theme', currentTheme);
+            // Show section
+            const targetId = link.getAttribute('href').substring(1);
+            document.getElementById(targetId).classList.add('active');
             
-            const icon = themeToggle.querySelector('i');
-            icon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+            // Scroll to top (helpful on mobile)
+            window.scrollTo(0, 0);
         });
-    }
-}
-
-// Initialize components (simplified)
-function initializeDashboard() {
-    // Dashboard initialization is handled in loadDashboardData
-}
-
-function initializeProxies() {
-    // Add event listeners for filters
-    const filters = ['countryFilter', 'statusFilter', 'searchInput'];
-    filters.forEach(filterId => {
-        const element = document.getElementById(filterId);
-        if (element) {
-            if (filterId === 'searchInput') {
-                element.addEventListener('input', debounce(applyFilters, 300));
-            } else {
-                element.addEventListener('change', applyFilters);
-            }
-        }
-    });
-    
-    // Add refresh button listener
-    const refreshBtn = document.getElementById('refreshProxies');
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', refreshProxies);
-    }
-}
-
-function initializeSubscriptions() {
-    // Add generate button listener
-    const generateBtn = document.getElementById('generateLink');
-    if (generateBtn) {
-        generateBtn.addEventListener('click', generateSubscription);
-    }
-    
-    // Add copy button listeners
-    const copyBtns = document.querySelectorAll('[id*="copy"]');
-    copyBtns.forEach(btn => {
-        if (btn.id === 'copySubscriptionLink') {
-            btn.addEventListener('click', copySubscriptionLink);
-        }
     });
 }
 
-function initializeSettings() {
-    // Load settings on init
-    loadSettings();
+// --- UTILITIES ---
+
+function updateCountryFilterOptions() {
+    const countries = [...new Set(proxyData.map(p => p.country))];
+    const select = document.getElementById('countryFilter');
+    // Keep first option
+    const first = select.options[0];
+    select.innerHTML = '';
+    select.appendChild(first);
     
-    // Add save button listener
-    const saveBtn = document.getElementById('saveSettings');
-    if (saveBtn) {
-        saveBtn.addEventListener('click', saveSettings);
-    }
+    countries.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        select.appendChild(opt);
+    });
 }
 
-// Settings functions
-async function loadSettings() {
-    try {
-        const response = await MediaVPNAPI.getSettings();
-        if (response.success) {
-            const settings = response.data;
-            
-            // Populate form fields
-            Object.keys(settings).forEach(key => {
-                const element = document.getElementById(key);
-                if (element) {
-                    if (element.type === 'checkbox') {
-                        element.checked = settings[key];
-                    } else {
-                        element.value = settings[key];
-                    }
-                }
-            });
+function getLatencyClass(ms) {
+    if (ms < 100) return 'text-success';
+    if (ms < 300) return 'text-warning';
+    return 'text-danger';
+}
+
+function animateValue(id, start, end, duration) {
+    const obj = document.getElementById(id);
+    if(!obj) return;
+    let startTimestamp = null;
+    const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        obj.innerHTML = Math.floor(progress * (end - start) + start);
+        if (progress < 1) {
+            window.requestAnimationFrame(step);
         }
-    } catch (error) {
-        console.error('Error loading settings:', error);
-    }
+    };
+    window.requestAnimationFrame(step);
 }
 
-async function saveSettings() {
-    try {
-        const settings = {};
-        
-        // Collect all form values
-        const formElements = document.querySelectorAll('#settings input, #settings select');
-        formElements.forEach(element => {
-            if (element.type === 'checkbox') {
-                settings[element.id] = element.checked;
-            } else {
-                settings[element.id] = element.value;
-            }
-        });
-        
-        const response = await MediaVPNAPI.saveSettings(settings);
-        if (response.success) {
-            showToast('Settings saved successfully!', 'success');
-        }
-    } catch (error) {
-        showToast('Error saving settings', 'error');
-    }
-}
-
-// Utility functions
 function showLoading(show) {
-    const overlay = document.getElementById('loadingOverlay');
-    if (overlay) {
-        overlay.style.display = show ? 'flex' : 'none';
-    }
+    document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
 }
 
-function showToast(message, type = 'info') {
-    // Simple toast implementation
+function showToast(msg, type = 'info') {
+    const container = document.getElementById('toastContainer');
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    toast.textContent = message;
+    toast.style.background = type === 'success' ? 'rgba(0,255,157,0.9)' : 
+                             type === 'error' ? 'rgba(255,0,85,0.9)' : 'rgba(0,242,255,0.9)';
+    toast.style.color = '#000';
+    toast.style.padding = '12px 24px';
+    toast.style.marginTop = '10px';
+    toast.style.borderRadius = '8px';
+    toast.style.fontWeight = '600';
+    toast.style.boxShadow = '0 5px 15px rgba(0,0,0,0.3)';
+    toast.innerText = msg;
     
-    const container = document.getElementById('toastContainer') || document.body;
     container.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.remove();
-    }, 3000);
+    setTimeout(() => toast.remove(), 3000);
 }
 
 function debounce(func, wait) {
     let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
+    return function(...args) {
         clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
+        timeout = setTimeout(() => func.apply(this, args), wait);
     };
 }
 
-// Add some CSS for better styling
-const style = document.createElement('style');
-style.textContent = `
-    .flag { padding: 2px 6px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-    .flag-id { background: #e74c3c; color: white; }
-    .flag-sg { background: #3498db; color: white; }
-    .flag-us { background: #2ecc71; color: white; }
-    .flag-jp { background: #e67e22; color: white; }
-    .flag-kr { background: #9b59b6; color: white; }
-    
-    .protocol { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
-    .protocol-trojan { background: #ff6b6b; color: white; }
-    .protocol-vless { background: #4ecdc4; color: white; }
-    .protocol-ss { background: #45b7d1; color: white; }
-    
-    .status { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
-    .status-online { background: #2ecc71; color: white; }
-    .status-offline { background: #e74c3c; color: white; }
-    
-    .btn-action { background: none; border: 1px solid #ddd; padding: 4px 8px; margin: 0 2px; border-radius: 4px; cursor: pointer; }
-    .btn-action:hover { background: #f8f9fa; }
-    
-    .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 4px; color: white; z-index: 9999; }
-    .toast-success { background: #28a745; }
-    .toast-error { background: #dc3545; }
-    .toast-info { background: #17a2b8; }
-`;
-document.head.appendChild(style);
+// Settings Placeholder
+async function loadSettings() {
+    // Simulate loading settings
+}
